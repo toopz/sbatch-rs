@@ -55,8 +55,8 @@ pub enum SbatchOptionError {
 ///
 /// Returns an error if the value is not a valid `NonZeroU32`.
 fn parse_u32(value: impl ToString) -> Result<NonZeroU32, SbatchOptionError> {
-    let parsed_value = value.to_string().parse::<u32>()?;
-    NonZeroU32::try_from(parsed_value).map_err(SbatchOptionError::from)
+    let value = value.to_string();
+    NonZeroU32::from_str(&value).map_err(|e| e.into())
 }
 
 impl SbatchOption {
@@ -239,5 +239,32 @@ impl FromStr for SbatchOption {
             .ok_or_else(|| SbatchOptionError::UnknownArgument(s.to_string()))?;
 
         SbatchOption::from_key_value(regex_match.key(), regex_match.value())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("1", NonZeroU32::new(1).unwrap())]
+    #[case("10", NonZeroU32::new(10).unwrap())]
+    #[case("100", NonZeroU32::new(100).unwrap())]
+    #[case("1000", NonZeroU32::new(1000).unwrap())]
+    fn test_parse_u32(#[case] value: &str, #[case] expected: NonZeroU32) {
+        assert_eq!(parse_u32(value).unwrap(), expected);
+    }
+
+    #[rstest]
+    #[case("")]
+    #[case("account")]
+    #[case("acctg-freq")]
+    #[case("0")]
+    #[case("-1")]
+    #[case("1.0")]
+    fn test_parse_u32_error(#[case] value: &str) {
+        let result = parse_u32(value);
+        assert!(result.is_err());
     }
 }

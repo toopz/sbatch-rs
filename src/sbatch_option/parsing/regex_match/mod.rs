@@ -1,13 +1,9 @@
 //! Regex match for parsing sbatch options.
-use once_cell::sync::Lazy;
-use regex::Regex;
 
-/// Regex patterns for parsing sbatch options
-static LONG_ARG_WITH_VAL: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^--(\w[\w-]+)[=\s](.+)$").unwrap());
-static LONG_ARG_WITHOUT_VAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"^--(\w[\w-]+)$").unwrap());
-static SHORT_ARG_WITH_VAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"^-(\w)\s(.+)$").unwrap());
-static SHORT_ARG_WITHOUT_VAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"^-(\w)$").unwrap());
+mod parse_long_arg_with_value;
+mod parse_long_arg_without_value;
+mod parse_short_arg_with_value;
+mod parse_short_arg_without_value;
 
 /// Represents a regex match for parsing sbatch options.
 ///
@@ -91,25 +87,10 @@ impl<'a> RegexMatch<'a> {
     ///
     /// A `RegexMatch` enum if the input string matches a regex pattern, otherwise `None`.
     pub fn from_str(value: &'a str) -> Option<Self> {
-        if let Some(captures) = LONG_ARG_WITH_VAL.captures(value.trim()) {
-            let key = captures.get(1)?.as_str();
-            let value = captures.get(2)?.as_str();
-            return Some(RegexMatch::LongArgWithValue(key, value));
-        }
-        if let Some(captures) = LONG_ARG_WITHOUT_VAL.captures(value.trim()) {
-            let key = captures.get(1)?.as_str();
-            return Some(RegexMatch::LongArg(key));
-        }
-        if let Some(captures) = SHORT_ARG_WITH_VAL.captures(value.trim()) {
-            let key = captures.get(1)?.as_str();
-            let value = captures.get(2)?.as_str();
-            return Some(RegexMatch::ShortArgWithValue(key, value));
-        }
-        if let Some(captures) = SHORT_ARG_WITHOUT_VAL.captures(value.trim()) {
-            let key = captures.get(1)?.as_str();
-            return Some(RegexMatch::ShortArg(key));
-        }
-        None
+        parse_long_arg_with_value::parse(value)
+            .or_else(|| parse_long_arg_without_value::parse(value))
+            .or_else(|| parse_short_arg_with_value::parse(value))
+            .or_else(|| parse_short_arg_without_value::parse(value))
     }
 }
 
