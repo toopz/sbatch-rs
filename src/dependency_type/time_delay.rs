@@ -6,10 +6,10 @@
 //! struct implements the `FromStr` trait to allow parsing a string into a `TimeDelay` struct.
 //! TimeDelay can also be created from a `u32` using the `TryFrom` trait.
 
+use std::fmt::Display;
 use std::num::{NonZeroU32, ParseIntError, TryFromIntError};
 use std::str::FromStr;
 
-use derive_more::Display;
 use thiserror::Error;
 
 /// Represents a time delay for job dependencies.
@@ -17,7 +17,7 @@ use thiserror::Error;
 /// The `TimeDelay` struct represents a time delay for job dependencies. It is a wrapper around
 /// a `NonZeroU32` and provides a way to parse a string into a valid time delay. The `TimeDelay`
 /// struct implements the `FromStr` trait to allow parsing a string into a `TimeDelay` struct.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TimeDelay(NonZeroU32);
 
 /// Error type for the `TimeDelay` struct
@@ -31,6 +31,17 @@ pub enum TimeDelayError {
     /// Error when converting a `u32` into a `TimeDelay`
     #[error("TryFromIntError: {0}")]
     TryFromIntError(#[from] TryFromIntError),
+}
+
+impl Display for TimeDelay {
+    /// Formats the `TimeDelay` struct as a string.
+    ///
+    /// # Returns
+    ///
+    /// A string that represents the time delay.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 impl FromStr for TimeDelay {

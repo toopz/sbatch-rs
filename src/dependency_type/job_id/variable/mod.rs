@@ -82,9 +82,9 @@ impl Variable {
     /// Creates a new `Variable` after validating the input string.
     ///
     /// # Arguments
-    /// 
+    ///
     /// * `value` - An object that can be converted into a string
-    /// 
+    ///
     /// # Errors
     ///
     /// Returns a `VariableError` if the input string is empty, contains invalid characters,

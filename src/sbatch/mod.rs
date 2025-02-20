@@ -241,8 +241,7 @@ mod tests {
     #[test]
     fn test_to_string_with_options() {
         let mut sbatch_job = Sbatch::new();
-        let option =
-            SbatchOption::Wrap(r#""echo "hello world"""#.to_string());
+        let option = SbatchOption::Wrap(r#""echo "hello world"""#.to_string());
         sbatch_job.append_option(option).unwrap();
         assert_eq!(
             sbatch_job.to_bash().unwrap(),

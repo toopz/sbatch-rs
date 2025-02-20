@@ -1,10 +1,10 @@
 //! JobId type and related functions
 //!
 //! The `JobId` enum represents a job id in sbatch. It can be either a number or a variable.
+use std::fmt::Display;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
-use derive_more::Display;
 use thiserror::Error;
 
 mod variable;
@@ -14,7 +14,7 @@ pub use variable::{Variable, VariableError};
 /// Represents a job id in sbatch
 ///
 /// The `JobId` enum represents a job id in sbatch. It can be either a number or a variable.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum JobId {
     /// A job id represented as a number, e.g. 1234
     Number(NonZeroU32),
@@ -29,6 +29,20 @@ pub enum JobId {
 pub enum JobIdError {
     #[error("Failed to parse JobId from string: {0}")]
     ParseError(String),
+}
+
+impl Display for JobId {
+    /// Formats the `JobId` enum as a string.
+    ///
+    /// # Returns
+    ///
+    /// A string that represents the job id.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobId::Number(number) => write!(f, "{}", number),
+            JobId::Variable(variable) => write!(f, "{}", variable),
+        }
+    }
 }
 
 impl From<NonZeroU32> for JobId {

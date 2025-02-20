@@ -37,9 +37,9 @@ impl Name {
     /// Creates a new `Name` after validating the input string.
     ///
     /// # Arguments
-    /// 
+    ///
     /// * `value` - An object that can be converted into a string
-    /// 
+    ///
     /// # Errors
     ///
     /// Returns a `NameError` if the input string is empty, contains invalid characters,
