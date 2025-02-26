@@ -1,26 +1,21 @@
 //! Display implementation for `SbatchOption`
-//!
-//! This module contains the display implementation for the `SbatchOption` enum.
-//!
-//! The `Display` trait is implemented for `SbatchOption` to allow the `SbatchOption` to be converted into a string for display purposes.
-//!
-//! # Example
-//!
-//! ```
-//! use sbatch_rs::SbatchOption;
-//!
-//! let option = SbatchOption::JobName("test".to_string());
-//! assert_eq!(option.to_string(), "--job-name=test");
-//! ```
 
 use super::SbatchOption;
-use std::fmt::Display;
 
-/// Display implementation for `SbatchOption`
-impl Display for SbatchOption {
+impl std::fmt::Display for SbatchOption {
+    /// The `Display` trait is implemented for `SbatchOption` to allow the `SbatchOption` to be converted into a string for display purposes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sbatch_rs::SbatchOption;
+    ///
+    /// let option = SbatchOption::JobName("test".to_string());
+    /// assert_eq!(option.to_string(), "--job-name=test");
+    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SbatchOption::Account(value) => write!(f, r#"--account={}"#, value),
+            SbatchOption::Account(value) => write!(f, "--account={}", value),
             SbatchOption::AcctgFreq(value) => write!(f, "--acctg-freq={}", value),
             SbatchOption::Array(value) => write!(f, "--array={}", value),
             SbatchOption::Batch(value) => write!(f, "--batch={}", value),
@@ -135,7 +130,7 @@ impl Display for SbatchOption {
             SbatchOption::Wait => write!(f, "--wait"),
             SbatchOption::WaitAllNodes(value) => write!(f, "--wait-all-nodes={}", value),
             SbatchOption::WCKey(value) => write!(f, "--wckey={}", value),
-            SbatchOption::Wrap(value) => write!(f, "--wrap={}", value),
+            SbatchOption::Wrap(value) => write!(f, r#"--wrap="{}""#, value),
         }
     }
 }

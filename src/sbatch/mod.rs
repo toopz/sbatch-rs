@@ -1,270 +1,209 @@
-//! This module provides a struct to build sbatch commands.
-//!
-//! The `Sbatch` struct provides methods to append, overwrite, and discard sbatch options.
-//! The `Sbatch` struct also provides a method to add a script to the sbatch command.
-//! The `Sbatch` struct provides a method to convert the sbatch command to a string.
-//!
-//! # Example
-//!
-//! ```
-//! use sbatch_rs::{Sbatch, SbatchOption};
-//!
-//! let mut sbatch_job = Sbatch::new();
-//! let option = SbatchOption::JobName("test".to_string());
-//! sbatch_job.append_option(option).unwrap();
-//! sbatch_job.with_script("test.sh".to_string());
-//! assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch --job-name=test test.sh");
-//! ```
+//! This module provides a builder for the `sbatch` command in Slurm.
+
+use std::collections::BTreeSet;
 use thiserror::Error;
 
-mod sbatch_option_list;
+use crate::{SbatchOption, SbatchOptionError};
 
-use crate::SbatchOption;
-use sbatch_option_list::{SbatchOptionList, SbatchOptionListError};
-
-/// A struct to build sbatch commands.
+/// sbatch command builder
 ///
-/// The `Sbatch` struct provides methods to append, overwrite, and discard sbatch options.
-///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use sbatch_rs::{Sbatch, SbatchOption};
 ///
-/// let mut sbatch_job = Sbatch::new();
-/// let option = SbatchOption::JobName("test".to_string());
-/// sbatch_job.append_option(option).unwrap();
-/// sbatch_job.with_script("test.sh".to_string());
-/// assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch --job-name=test test.sh");
+/// // Create a new `Sbatch` instance
+/// let sbatch = Sbatch::new()
+///     .add_option(SbatchOption::JobName("test".to_string())).unwrap()
+///     .add_option(SbatchOption::Output("test.out".to_string())).unwrap()
+///     .add_option(SbatchOption::Error("test.err".to_string())).unwrap()
+///     .set_script("test.sh".to_string()).unwrap()
+///     .build();
+///
+/// // Verify that the `sbatch` command was built properly
+/// assert!(sbatch.is_ok());
+/// assert_eq!(sbatch.unwrap(), "sbatch --error=test.err --job-name=test --output=test.out test.sh");
 /// ```
 #[derive(Debug, Clone)]
 pub struct Sbatch {
-    sbatch_options: SbatchOptionList,
+    sbatch_options: Option<BTreeSet<SbatchOption>>,
     script: Option<String>,
 }
 
-/// Error type for the `Sbatch` struct
+/// The `SbatchError` enum represents an error that can occur when building an `sbatch` command.
 ///
-/// The `SbatchError` enum represents all possible errors that can occur when working with the `Sbatch` struct.
-#[derive(Debug, Error, PartialEq, Eq)]
+/// Errors include:
+/// - No options or script provided
+/// - Script is empty
+/// - Sbatch option error
+#[derive(Debug, Error)]
 pub enum SbatchError {
-    #[error("Error when trying to append an existing sbatch option")]
-    OptionExists(#[from] SbatchOptionListError),
-    #[error("No wrap option or script provided")]
-    NoWrapOptionOrScript,
+    #[error("No sbatch options or script provided")]
+    NoOptionsOrScript,
+    #[error("Script is empty")]
+    ScriptEmpty,
+    #[error("Sbatch option error: {0}")]
+    SbatchOptionError(#[from] SbatchOptionError),
+    #[error("Execution failed: {0}")]
+    SbatchExecutionError(String),
 }
 
 impl Sbatch {
-    /// Creates a new `Sbatch`.
+    /// Creates a new `Sbatch` instance.
     ///
-    /// # Returns
-    ///
-    /// A new `Sbatch` struct.
-    pub fn new() -> Self {
-        Sbatch {
-            sbatch_options: SbatchOptionList::new(),
-            script: None,
-        }
-    }
-
-    /// Appends a sbatch option to the list of sbatch options.
-    ///
-    /// # Arguments
-    ///
-    /// * `option` - The sbatch option to append
-    ///
-    /// # Returns
-    ///
-    /// A mutable reference to the `Sbatch` struct.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `SbatchError` if the sbatch option already exists in the list.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use sbatch_rs::{Sbatch, SbatchOption};
-    ///
-    /// let mut sbatch_job = Sbatch::new();
-    ///
-    /// let option = SbatchOption::JobName("test".to_string());
-    /// sbatch_job.append_option(option).unwrap();
-    ///
-    /// let option = SbatchOption::JobName("test2".to_string());
-    /// let result = sbatch_job.append_option(option);
-    /// assert!(result.is_err());
-    /// ```
-    pub fn append_option(&mut self, option: SbatchOption) -> Result<&mut Self, SbatchError> {
-        self.sbatch_options.append(option)?;
-        Ok(self)
-    }
-
-    /// Overwrites a sbatch option in the list of sbatch options.
-    ///
-    /// # Arguments
-    ///
-    /// * `option` - The sbatch option to overwrite
-    ///
-    /// # Returns
-    ///
-    /// A mutable reference to the `Sbatch` struct.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use sbatch_rs::{Sbatch, SbatchOption};
-    ///
-    /// let mut sbatch_job = Sbatch::new();
-    ///
-    /// let option = SbatchOption::JobName("test".to_string());
-    /// sbatch_job.append_option(option).unwrap();
-    ///
-    /// let option = SbatchOption::JobName("test2".to_string());
-    /// sbatch_job.overwrite_option(option);
-    /// ```
-    pub fn overwrite_option(&mut self, option: SbatchOption) -> &mut Self {
-        self.sbatch_options.overwrite(option);
-        self
-    }
-
-    /// Adds a script to the sbatch command.
-    ///
-    /// # Arguments
-    ///
-    /// * `script` - The script to add to the sbatch command
-    ///
-    /// # Returns
-    ///
-    /// A mutable reference to the `Sbatch` struct.
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use sbatch_rs::Sbatch;
     ///
-    /// let mut sbatch_job = Sbatch::new();
-    /// sbatch_job.with_script("test.sh".to_string());
-    ///
-    /// assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch test.sh");
+    /// // Create a new `Sbatch` instance
+    /// let sbatch = Sbatch::new();
     /// ```
-    pub fn with_script(&mut self, script: String) -> &mut Self {
-        self.script = Some(script);
-        self
+    pub fn new() -> Self {
+        Sbatch {
+            sbatch_options: None,
+            script: None,
+        }
     }
 
-    /// Converts the sbatch command to a string.
+    /// Adds an `SbatchOption` to the `Sbatch` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `option` - An `SbatchOption` to add to the `Sbatch` instance.
     ///
     /// # Returns
     ///
-    /// A string that represents the sbatch command.
+    /// This function returns a mutable reference to the `Sbatch` instance.
     ///
     /// # Errors
     ///
-    /// Returns a `SbatchError` if no wrap option or script is provided.
+    /// This function returns a `SbatchError` if the `SbatchOption` is invalid.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use sbatch_rs::{Sbatch, SbatchOption};
     ///
-    /// let mut sbatch_job = Sbatch::new();
+    /// // Create a new `Sbatch` instance
+    /// let sbatch = Sbatch::new()
+    ///     .add_option(SbatchOption::JobName("test".to_string())).unwrap()
+    ///     .add_option(SbatchOption::Output("test.out".to_string())).unwrap()
+    ///     .add_option(SbatchOption::Error("test.err".to_string())).unwrap()
+    ///     .add_option(SbatchOption::Wrap("test".to_string())).unwrap()
+    ///     .build();
     ///
-    /// let option = SbatchOption::JobName("test".to_string());
-    /// sbatch_job.append_option(option).unwrap();
-    /// sbatch_job.with_script("test.sh".to_string());
-    ///
-    /// assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch --job-name=test test.sh");
+    /// // Verify that the `sbatch` command was built properly
+    /// assert!(sbatch.is_ok());
+    /// assert_eq!(sbatch.unwrap(), "sbatch --error=test.err --job-name=test --output=test.out --wrap=\"test\"");
     /// ```
-    pub fn to_bash(&self) -> Result<String, SbatchError> {
-        let options = self.sbatch_options.to_string();
-        let script = &self.script;
+    pub fn add_option(&mut self, option: SbatchOption) -> Result<&mut Self, SbatchError> {
+        // Validate the option
+        option.validate()?;
 
-        match (options.is_empty(), script) {
-            (false, Some(s)) => Ok(format!("sbatch {} {}", options, s)),
-            (false, None) => Ok(format!("sbatch {}", options)),
-            (true, Some(s)) => Ok(format!("sbatch {}", s)),
-            (true, None) => Err(SbatchError::NoWrapOptionOrScript),
+        // Add the option to the set
+        self.sbatch_options
+            .get_or_insert_with(BTreeSet::new)
+            .insert(option);
+        Ok(self)
+    }
+
+    /// Sets the script for the `Sbatch` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - A string representing the script to run.
+    ///
+    /// # Returns
+    ///
+    /// This function returns a mutable reference to the `Sbatch` instance.
+    ///
+    /// # Errors
+    ///
+    /// This function returns a `SbatchError` if the script is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sbatch_rs::Sbatch;
+    ///
+    /// // Create a new `Sbatch` instance
+    /// let sbatch = Sbatch::new()
+    ///     .set_script("test.sh".to_string()).unwrap()
+    ///     .build();
+    ///
+    /// // Verify that the `sbatch` command was built properly
+    /// assert!(sbatch.is_ok());
+    /// assert_eq!(sbatch.unwrap(), "sbatch test.sh");
+    /// ```
+    pub fn set_script(&mut self, script: String) -> Result<&mut Self, SbatchError> {
+        let script = script.trim().to_string();
+        if script.is_empty() {
+            Err(SbatchError::ScriptEmpty)
+        } else {
+            self.script = Some(script);
+            Ok(self)
+        }
+    }
+
+    /// Builds the `sbatch` command.
+    ///
+    /// # Returns
+    ///
+    /// This function returns a string representing the `sbatch` command.
+    ///
+    /// # Errors
+    ///
+    /// This function returns a `SbatchError` if no options or script are provided.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sbatch_rs::{Sbatch, SbatchOption};
+    ///
+    /// // Create a new `Sbatch` instance
+    /// let sbatch = Sbatch::new()
+    ///     .add_option(SbatchOption::JobName("test".to_string())).unwrap()
+    ///     .add_option(SbatchOption::Output("test.out".to_string())).unwrap()
+    ///     .add_option(SbatchOption::Error("test.err".to_string())).unwrap()
+    ///     .set_script("test.sh".to_string()).unwrap()
+    ///     .build();
+    ///     
+    /// // Verify that the `sbatch` command was built properly
+    /// assert!(sbatch.is_ok());
+    /// assert_eq!(sbatch.unwrap(), "sbatch --error=test.err --job-name=test --output=test.out test.sh");
+    pub fn build(&self) -> Result<String, SbatchError> {
+        // Convert the sbatch options to a space-joined string
+        let options: Option<String> = self.sbatch_options.as_ref().map(|options| {
+            options
+                .iter()
+                .map(|o| o.to_string())
+                .collect::<Vec<String>>()
+                .join(" ")
+        });
+
+        // Combine the options and script
+        match (options, &self.script) {
+            (Some(o), Some(s)) => Ok(format!("sbatch {o} {s}")),
+            (Some(o), None) => Ok(format!("sbatch {o}")),
+            (None, Some(s)) => Ok(format!("sbatch {s}")),
+            (None, None) => Err(SbatchError::NoOptionsOrScript),
         }
     }
 }
 
 impl Default for Sbatch {
+    /// Creates a default `Sbatch` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sbatch_rs::Sbatch;
+    ///
+    /// // Create a default `Sbatch` instance
+    /// let sbatch = Sbatch::default();
+    /// ```
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_append_option() {
-        let mut sbatch_job = Sbatch::new();
-        let option = SbatchOption::JobName("test".to_string());
-        sbatch_job.append_option(option).unwrap();
-        assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch --job-name=test");
-    }
-
-    #[test]
-    fn test_overwrite_option() {
-        let mut sbatch_job = Sbatch::new();
-        let option = SbatchOption::JobName("test".to_string());
-        sbatch_job.append_option(option).unwrap();
-        let option = SbatchOption::JobName("test2".to_string());
-        sbatch_job.overwrite_option(option);
-        assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch --job-name=test2");
-    }
-
-    #[test]
-    fn test_with_script() {
-        let mut sbatch_job = Sbatch::new();
-        sbatch_job.with_script("test.sh".to_string());
-        assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch test.sh");
-    }
-
-    #[test]
-    fn test_to_string_no_options_or_script() {
-        let sbatch_job = Sbatch::new();
-        let result = sbatch_job.to_bash();
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_to_string_with_script() {
-        let mut sbatch_job = Sbatch::new();
-        sbatch_job.with_script("test.sh".to_string());
-        assert_eq!(sbatch_job.to_bash().unwrap(), "sbatch test.sh");
-    }
-
-    #[test]
-    fn test_to_string_with_options() {
-        let mut sbatch_job = Sbatch::new();
-        let option = SbatchOption::Wrap(r#""echo "hello world"""#.to_string());
-        sbatch_job.append_option(option).unwrap();
-        assert_eq!(
-            sbatch_job.to_bash().unwrap(),
-            r#"sbatch --wrap="echo "hello world"""#
-        );
-    }
-
-    #[test]
-    fn test_to_string_with_options_and_script() {
-        let mut sbatch_job = Sbatch::new();
-        let option = SbatchOption::JobName("test".to_string());
-        sbatch_job.append_option(option).unwrap();
-        sbatch_job.with_script("test.sh".to_string());
-        assert_eq!(
-            sbatch_job.to_bash().unwrap(),
-            r#"sbatch --job-name=test test.sh"#
-        );
-    }
-
-    #[test]
-    fn test_default() {
-        let sbatch_job = Sbatch::default();
-        let result = sbatch_job.to_bash();
-        assert!(result.is_err());
     }
 }
