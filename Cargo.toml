@@ -1,7 +1,13 @@
 [package]
 name = "sbatch-rs"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+authors = ["Andrew Tupper <andrew.s.tupper.phd@gmail.com>"]
+repository = "https://github.com/toopz/sbatch-rs"
+license = "MIT"
+readme = "README.md"
+description = "A simple sbatch command generator"
+keywords = ["slurm", "sbatch", "hpc"]
 
 [dependencies]
 thiserror = "2.0.11"
